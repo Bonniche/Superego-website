@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Superego AI camera</title>
+    <style>
+        #photoUploaded{
+            display: none;
+        }
+        #photo-container{
+            display: flex;
+            flex-wrap: wrap;
+            height: 20vh;
+        }
+        #photo-container div{
+            max-width: 100%;
+            height: 100%;
+            width: auto;
+            margin: 1rem;
+        }
+        #photo-container img{
+            max-width: 100%;
+            height: 100%;
+            width: auto;
+            display: block;
+        }
+        .loader {
+            border: 16px solid #f3f3f3; /* Light grey */
+            border-top: 16px solid #3498db; /* Blue */
+            border-radius: 50%;
+            width: 80px;
+            height: 80px;
+            animation: spin 2s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+	
+    <div><h3>Superego PFHK for Recylable Objects</h3></div>
+    
+    <button type="button" onclick="startWebcam()">Start webcam</button>
+    <button type="button" onclick="webcam.stop();">Stop webcam</button>
+    <input type="file" name="photoUploaded" id="photoUploaded" multiple>
+    <button type="button" onclick="document.getElementById('photoUploaded').click();">Select file</button>
+    <div id="webcam-container"></div>
+    <div id="label-container"></div>
+    <div id="photo-container"></div>
+    
+    
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+    <script type="text/javascript">
+
+        // More API functions here:
+        // https://github.com/googlecreativelab/teachablemachine-community/tree/master/libraries/image
+
+        // ********************************************************************************
+		// * TASK (B)
+		// * Change below to the model link provided by Teachable Machine export panel. E.g. 
+		// * 
+		// * const URL = "https://teachablemachine.withgoogle.com/models/?????????/";    
+		// ********************************************************************************
+		
+        const URL = "https://teachablemachine.withgoogle.com/models/TXfl4YLPY/";
+		
+	
+		//*********************************************************************
+		// END OF TASK B
+		//*********************************************************************
+
+        let model, webcam, labelContainer, maxPredictions;
+        // Load the image model and setup the webcam
+       
+        document.getElementById("photoUploaded").addEventListener("change",async (ev)=>{
+            
+            const files = ev.target.files,
+            photo_container=document.getElementById("photo-container"),
+            
+            modelURL = URL + "model.json",
+            metadataURL = URL + "metadata.json",
+            model = await tmImage.load(modelURL, metadataURL);
+            maxPredictions = model.getTotalClasses();
+            while(photo_container.firstChild){
+                photo_container.firstChild.remove()
+            }
+            for (let index = 0; index < files.length; index++) {
+                const element = files[index],
+                fr = new FileReader();
+                fr.addEventListener("load",()=>{
+                    const img=new Image(),
+                    div=document.createElement("div");
+                    img.src = fr.result;
+                    img.addEventListener("load",async ()=>{
+
+						div.appendChild(img);
+						
+						//*********************************************************************
+						// TASK (C)
+						// ADD THE CODE FOR ASKING THE MODEL TO MAKE A PREDICTION ON THE IMAGE!
+						//*********************************************************************
+						  const prediction = await model.predict(img);
+                        let className;
+                        for (let i = 0; i < maxPredictions; i++) {
+                            const classPrediction = prediction[i].className + ": " + prediction[i].probability.toFixed(2) + " ";
+                            if (prediction[0].probability > 0.5){
+                                className = "It is a " + prediction[0].className
+                            }
+                            else if(prediction[1].probability > 0.5){
+                                className = "It is a " + prediction[1].className
+                            }
+                            div.append(classPrediction);
+                        } div.append(document.createElement("br"));
+                        div.append(className);
+                    
+						//*********************************************************************
+						// END OF TASK C
+						//*********************************************************************
+						
+						
+						photo_container.appendChild(div);
+                    })
+                })
+                fr.readAsDataURL(element);
+            }
+        })
+		
+		
+		async function startWebcam() {
+            
+            const modelURL = URL + "model.json";
+            const metadataURL = URL + "metadata.json";
+    
+            // load the model and metadata
+            // Refer to tmImage.loadFromFiles() in the API to support files from a file picker
+            // or files from your local hard drive
+            // Note: the pose library adds "tmImage" object to your window (window.tmImage)
+            model = await tmImage.load(modelURL, metadataURL);
+            maxPredictions = model.getTotalClasses();
+            // Convenience function to setup a webcam
+            const flip = true; // whether to flip the webcam
+            webcam = new tmImage.Webcam(200, 200, flip); // width, height, flip
+            await webcam.setup(); // request access to the webcam
+            await webcam.play();
+            window.requestAnimationFrame(loop);
+
+            // append elements to the DOM
+            const webcam_container = document.getElementById("webcam-container");
+            if(webcam_container.childElementCount != 0){
+                while(webcam_container.firstChild){
+                    webcam_container.firstChild.remove()
+                }
+            }
+            webcam_container.appendChild(webcam.canvas);
+            labelContainer = document.getElementById("label-container");
+            for (let i = 0; i < maxPredictions; i++) { // and class labels
+                labelContainer.appendChild(document.createElement("div"));
+            }
+        }
+        
+        async function loop() {
+            webcam.update(); // update the webcam frame
+            await predict();
+            window.requestAnimationFrame(loop);
+        }
+
+        // run the webcam image through the image model
+        // async function predict() {
+        //     // predict can take in an image, video or canvas html element
+        //     const prediction = await model.predict(webcam.canvas);
+        //     for (let i = 0; i < maxPredictions; i++) {
+        //         const classPrediction =
+        //             prediction[i].className + ": " + prediction[i].probability.toFixed(2);
+        //         labelContainer.childNodes[i].innerHTML = classPrediction;
+        //     }
+        // }
+        async function predict(image){// predict can take in an image, video or canvas html element
+			//*********************************************************************
+			// TASK (D) (optional)
+			// ADD THE CODE FOR ASKING THE MODEL TO MAKE A PREDICTION ON THE WEBCAM IMAGE!
+			//*********************************************************************
+            const prediction = await model.predict(webcam.canvas);
+            for (let i = 0; i < maxPredictions; i++) {
+                const classPrediction =
+                    prediction[i].className + ": " + prediction[i].probability.toFixed(2);
+                labelContainer.childNodes[i].innerHTML = classPrediction;
+            }
+
+
+			//*********************************************************************
+			// END OF TASK D
+			//*********************************************************************
+        }
+
+    </script>
+
+</body>
+</html>
